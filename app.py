@@ -1,5 +1,9 @@
 import streamlit as st
 import time
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
+
 from agents import build_reader_agent, build_search_agent, writer_chain, critic_chain
 
 # ── Page config ──────────────────────────────────────────────────────────────
@@ -408,51 +412,56 @@ if st.session_state.running and not st.session_state.done:
     results = {}
     topic_val = st.session_state.topic_input
 
-    # ── Step 1: Search ──
-    with st.spinner("🔍  Search Agent is working…"):
-        search_agent = build_search_agent()
-        sr = search_agent.invoke({
-            "messages": [("user", f"Find recent, reliable and detailed information about: {topic_val}")]
-        })
-        results["search"] = sr["messages"][-1].content
-        st.session_state.results = dict(results)
-    st.rerun() if False else None   # keep inline for now
+    try:
+        # ── Step 1: Search ──
+        with st.spinner("🔍  Search Agent is working…"):
+            search_agent = build_search_agent()
+            sr = search_agent.invoke({
+                "messages": [("user", f"Find recent, reliable and detailed information about: {topic_val}")]
+            })
+            results["search"] = sr["messages"][-1].content
+            st.session_state.results = dict(results)
 
-    # ── Step 2: Reader ──
-    with st.spinner("📄  Reader Agent is scraping top resources…"):
-        reader_agent = build_reader_agent()
-        rr = reader_agent.invoke({
-            "messages": [("user",
-                f"Based on the following search results about '{topic_val}', "
-                f"pick the most relevant URL and scrape it for deeper content.\n\n"
-                f"Search Results:\n{results['search'][:800]}"
-            )]
-        })
-        results["reader"] = rr["messages"][-1].content
-        st.session_state.results = dict(results)
+        # ── Step 2: Reader ──
+        with st.spinner("📄  Reader Agent is scraping top resources…"):
+            reader_agent = build_reader_agent()
+            rr = reader_agent.invoke({
+                "messages": [("user",
+                    f"Based on the following search results about '{topic_val}', "
+                    f"pick the most relevant URL and scrape it for deeper content.\n\n"
+                    f"Search Results:\n{results['search'][:800]}"
+                )]
+            })
+            results["reader"] = rr["messages"][-1].content
+            st.session_state.results = dict(results)
 
-    # ── Step 3: Writer ──
-    with st.spinner("✍️  Writer is drafting the report…"):
-        research_combined = (
-            f"SEARCH RESULTS:\n{results['search']}\n\n"
-            f"DETAILED SCRAPED CONTENT:\n{results['reader']}"
-        )
-        results["writer"] = writer_chain.invoke({
-            "topic": topic_val,
-            "research": research_combined
-        })
-        st.session_state.results = dict(results)
+        # ── Step 3: Writer ──
+        with st.spinner("✍️  Writer is drafting the report…"):
+            research_combined = (
+                f"SEARCH RESULTS:\n{results['search'][:800]}\n\n"
+                f"DETAILED SCRAPED CONTENT:\n{results['reader'][:1200]}"
+            )
+            results["writer"] = writer_chain.invoke({
+                "topic": topic_val,
+                "research": research_combined
+            })
+            st.session_state.results = dict(results)
 
-    # ── Step 4: Critic ──
-    with st.spinner("🧐  Critic is reviewing the report…"):
-        results["critic"] = critic_chain.invoke({
-            "report": results["writer"]
-        })
-        st.session_state.results = dict(results)
+        # ── Step 4: Critic ──
+        with st.spinner("🧐  Critic is reviewing the report…"):
+            results["critic"] = critic_chain.invoke({
+                "report": results["writer"]
+            })
+            st.session_state.results = dict(results)
 
-    st.session_state.running = False
-    st.session_state.done = True
-    st.rerun()
+        st.session_state.running = False
+        st.session_state.done = True
+        st.rerun()
+
+    except Exception as e:
+        st.session_state.running = False
+        st.session_state.done = False
+        st.error(f"❌ Execution Error: {str(e)}")
 
 
 # ── Results display ───────────────────────────────────────────────────────────

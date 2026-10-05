@@ -1,3 +1,7 @@
+import sys
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 from agents import build_reader_agent , build_search_agent , writer_chain , critic_chain
 
 def run_research_pipeline(topic : str) -> dict:
@@ -42,8 +46,8 @@ def run_research_pipeline(topic : str) -> dict:
     print("="*50)
 
     research_combined = (
-        f"SEARCH RESULTS : \n {state['search_results']} \n\n"
-        f"DETAILED SCRAPED CONTENT : \n {state['scraped_content']}"
+        f"SEARCH RESULTS : \n {state['search_results'][:800]} \n\n"
+        f"DETAILED SCRAPED CONTENT : \n {state['scraped_content'][:1200]}"
     )
 
     state["report"] = writer_chain.invoke({
